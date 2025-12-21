@@ -1,0 +1,23 @@
+{
+  "name": "mailbot",
+  "version": "1.0.0",
+  "description": "Telegram bot for forwarding unread emails with attachments",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop mailbot",
+    "pm2:restart": "pm2 restart mailbot",
+    "pm2:logs": "pm2 logs mailbot",
+    "pm2:status": "pm2 status"
+  },
+  "keywords": ["telegram", "bot", "email", "imap"],
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "imap": "^0.8.19",
+    "mailparser": "^3.6.5",
+    "node-telegram-bot-api": "^0.64.0"
+  }
+}
