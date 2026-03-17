@@ -54,7 +54,7 @@ class TelegramService {
   /**
    * Send text message to Telegram
    */
-  async sendMessage(text) {
+  async sendMessage(text, retryCount = 0) {
     try {
       await this.bot.sendMessage(this.chatId, text, {
         parse_mode: 'HTML',
@@ -62,6 +62,10 @@ class TelegramService {
       });
       return true;
     } catch (err) {
+      if (retryCount === 0) {
+        const newChatId = await this.handleTelegramError(err);
+        if (newChatId) return this.sendMessage(text, 1);
+      }
       console.error('[Telegram] Error sending message:', err.message);
       throw err;
     }
@@ -70,7 +74,7 @@ class TelegramService {
   /**
    * Send document/attachment to Telegram
    */
-  async sendDocument(buffer, filename, caption = '') {
+  async sendDocument(buffer, filename, caption = '', retryCount = 0) {
     try {
       await this.bot.sendDocument(
         this.chatId,
@@ -86,6 +90,10 @@ class TelegramService {
       );
       return true;
     } catch (err) {
+      if (retryCount === 0) {
+        const newChatId = await this.handleTelegramError(err);
+        if (newChatId) return this.sendDocument(buffer, filename, caption, 1);
+      }
       console.error(`[Telegram] Error sending document ${filename}:`, err.message);
       throw err;
     }
@@ -147,6 +155,38 @@ class TelegramService {
    */
   delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Handle specific Telegram errors, such as chat ID migration
+   */
+  async handleTelegramError(err) {
+    if (err.code === 'ETELEGRAM' && err.response && err.response.body) {
+      const body = err.response.body;
+      if (body.description && body.description.includes('group chat was upgraded')) {
+        const migrateToChatId = body.parameters && body.parameters.migrate_to_chat_id;
+        if (migrateToChatId) {
+          console.log(`[Telegram] Automatically migrating chat ID from ${this.chatId} to ${migrateToChatId}`);
+          this.chatId = migrateToChatId;
+          
+          try {
+            const fs = require('fs');
+            const path = require('path');
+            const envPath = path.join(__dirname, '..', '.env');
+            if (fs.existsSync(envPath)) {
+              let envContent = fs.readFileSync(envPath, 'utf8');
+              envContent = envContent.replace(/TELEGRAM_CHAT_ID=.*/, `TELEGRAM_CHAT_ID=${migrateToChatId}`);
+              fs.writeFileSync(envPath, envContent);
+              console.log('[Telegram] Updated .env file with new chat ID');
+            }
+          } catch (e) {
+            console.error('[Telegram] Failed to update .env automatically:', e.message);
+          }
+          return migrateToChatId;
+        }
+      }
+    }
+    return null;
   }
 
   /**
